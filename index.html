@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xPoints da xStocks — quanto vale um ponto</title>
+<meta name="description" content="Calculadora não oficial: custo por milhão de xPoints via YT da Pendle e o FDV necessário para empatar.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#15181B;
+  --panel:#1D2226;
+  --panel-2:#252B30;
+  --ink:#EDF2EF;
+  --ink-soft:#98A5A1;
+  --ink-faint:#6B7873;
+  --rule:#2E353A;
+  --rule-strong:#414A50;
+  --mint:#4AE3B5;
+  --teal:#2FC9C2;
+  --up:#4AE3B5;
+  --up-bg:#14322B;
+  --down:#F0846F;
+  --down-bg:#33201C;
+  --sans:'Archivo',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:16px;line-height:1.6;
+  font-feature-settings:"tnum";
+}
+.wrap{max-width:1080px;margin:0 auto;padding:40px 24px 72px}
+
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:32px;flex-wrap:wrap}
+.brand-text{margin-right:auto}
+.by{
+  display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;
+  padding:8px 15px;border-radius:99px;text-decoration:none;
+  background:var(--panel);border:1px solid var(--rule-strong);
+  color:var(--ink);font-size:14px;font-weight:600;
+}
+.by:hover{border-color:var(--mint);color:var(--mint)}
+.by:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+.mark{
+  height:38px;width:auto;flex:0 0 auto;display:block;
+}
+.mark-fallback{
+  width:38px;height:38px;border-radius:9px;flex:0 0 38px;
+  background:linear-gradient(135deg,var(--mint),var(--teal));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:17px;color:#0E1416;letter-spacing:-.04em;
+}
+.brand-text strong{display:block;font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.25}
+.brand-text span{display:block;font-size:12px;color:var(--ink-faint)}
+
+header{margin-bottom:28px;max-width:64ch}
+h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin:0 0 10px;line-height:1.25}
+header p{margin:0;color:var(--ink-soft);font-size:15px}
+
+.ref{
+  display:flex;flex-wrap:wrap;align-items:center;gap:16px;
+  background:var(--panel);border:1px solid var(--rule);
+  border-left:3px solid var(--mint);border-radius:0 6px 6px 0;
+  padding:16px 20px;margin-bottom:32px;
+}
+.ref p{margin:0;font-size:14.5px;color:var(--ink-soft);flex:1 1 300px}
+.ref b{color:var(--ink);font-weight:600}
+.ref a{
+  flex:0 0 auto;text-decoration:none;border-radius:6px;padding:10px 20px;
+  background:linear-gradient(135deg,var(--mint),var(--teal));
+  color:#0E1416;font-size:14.5px;font-weight:600;white-space:nowrap;
+}
+.ref a:hover{filter:brightness(1.08)}
+.ref a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+.hero{
+  background:var(--panel);border:1px solid var(--rule);border-radius:8px;
+  padding:26px 30px;margin-bottom:32px;
+}
+.hero-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:6px}
+.hero-label{font-size:14px;color:var(--ink-soft)}
+.hero-fdv label{font-size:13px;margin-bottom:4px}
+.hero-fdv input{width:132px;height:34px}
+.hero-value{
+  font-family:var(--mono);font-size:clamp(38px,7.5vw,64px);font-weight:500;
+  letter-spacing:-.03em;line-height:1;margin:0;
+  background:linear-gradient(135deg,var(--mint),var(--teal));
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+}
+.hero-value.lose{
+  background:none;color:var(--down);-webkit-text-fill-color:var(--down);
+}
+.hero-note{font-size:14px;color:var(--ink-soft);margin:14px 0 0;max-width:62ch}
+
+.cols{display:grid;grid-template-columns:1fr;gap:28px}
+@media(min-width:880px){.cols{grid-template-columns:1.12fr .88fr;gap:44px}}
+
+h2{font-size:15px;font-weight:600;margin:0 0 4px}
+.sub{font-size:13px;color:var(--ink-faint);margin:0 0 16px;max-width:52ch}
+.sub a{color:var(--mint);text-decoration:none;border-bottom:1px solid var(--rule-strong)}
+.sub a:hover{border-bottom-color:var(--mint)}
+section{margin-bottom:30px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:14px}
+label{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:5px}
+input[type=number],input[type=date]{
+  width:100%;height:38px;padding:0 10px;
+  font-family:var(--mono);font-size:14px;color:var(--ink);
+  background:var(--panel-2);border:1px solid var(--rule-strong);border-radius:6px;
+}
+input[type=date]{color-scheme:dark}
+input:hover{border-color:var(--ink-faint)}
+input:focus-visible{outline:2px solid var(--mint);outline-offset:1px;border-color:var(--mint)}
+
+.slider{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.slider label{flex:0 0 126px;margin:0;font-size:14px}
+.slider input[type=number]{flex:0 0 78px;height:32px;padding:0 8px;text-align:right;font-weight:500}
+input[type=range]{flex:1;-webkit-appearance:none;appearance:none;background:none;height:20px}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--rule-strong)}
+input[type=range]::-moz-range-track{height:2px;background:var(--rule-strong)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--mint);margin-top:-6.5px}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border:0;border-radius:50%;background:var(--mint)}
+input[type=range]:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(116px,1fr));gap:12px;margin-bottom:18px}
+.stat{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:12px 14px}
+.stat dt{font-size:13px;color:var(--ink-soft);margin:0 0 2px}
+.stat dd{margin:0;font-family:var(--mono);font-size:19px;font-weight:500;letter-spacing:-.01em}
+
+.note{font-size:13px;color:var(--ink-soft);margin:10px 0 0}
+.err{font-size:13px;color:var(--down);margin:10px 0 0;display:none}
+
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:14px;margin-top:8px}
+th{
+  text-align:right;font-family:var(--sans);font-size:13px;font-weight:500;
+  color:var(--ink-soft);padding:0 8px 8px 0;border-bottom:1px solid var(--rule-strong);
+}
+th:first-child{text-align:left;padding-left:0}
+th:last-child{padding-right:0}
+td{text-align:right;padding:7px 8px 7px 0;border-bottom:1px solid var(--rule)}
+td:first-child{text-align:left;padding-left:0}
+td:last-child{padding-right:0}
+tr.win td{background:var(--up-bg)}
+tr.win .m,tr.win .p{color:var(--up)}
+tr.lose .m,tr.lose .p{color:var(--down)}
+
+.scen{margin-top:12px}
+.scen h2{font-size:18px;letter-spacing:-.01em}
+.scen .sub{max-width:72ch;margin-bottom:18px;font-size:14px;color:var(--ink-soft)}
+.scen table{font-size:15px}
+.scen th{font-size:14px;padding-bottom:10px}
+.scen td{padding:11px 8px 11px 0}
+tr.me td{font-weight:600}
+.tag{
+  display:inline-block;margin-left:9px;padding:2px 9px;border-radius:99px;
+  font-family:var(--sans);font-size:12px;font-weight:500;
+  background:linear-gradient(135deg,var(--mint),var(--teal));color:#0E1416;
+}
+
+footer{margin-top:44px;padding-top:24px;border-top:1px solid var(--rule);max-width:68ch}
+footer p{font-size:14px;color:var(--ink-soft);margin:0 0 12px}
+footer code{font-family:var(--mono);font-size:13px;color:var(--ink)}
+footer .credit{
+  margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);
+  font-size:14.5px;color:var(--ink);
+}
+footer .credit a{font-weight:600;text-decoration:none;border-bottom:1px solid var(--mint)}
+footer .credit a:hover{background:var(--up-bg)}
+footer a{color:var(--mint)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="brand">
+  <!-- Salve o logo oficial como xstocks-logo.svg na mesma pasta deste arquivo.
+       Se o arquivo não existir, o bloco verde abaixo aparece no lugar. -->
+  <img class="mark" src="xstocks-logo.svg" alt="xStocks"
+       onerror="this.outerHTML='&lt;div class=\'mark-fallback\' aria-hidden=\'true\'&gt;xP&lt;/div&gt;'">
+  <div class="brand-text">
+    <strong>Calculadora de xPoints da xStocks</strong>
+    <span>projeto independente, sem vínculo com xStocks, Backed ou Kraken</span>
+  </div>
+  <a class="by" href="https://x.com/0xMoochi" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    <span>@0xMoochi</span>
+  </a>
+</div>
+
+<header>
+  <h1>Quanto custa um milhão de xPoints</h1>
+  <p>Os xPoints não têm mercado. O que existe é o preço de <em>adquiri-los</em> via YT na Pendle, e o valuation que o token precisaria atingir para esse preço ter valido a pena.</p>
+</header>
+
+<div class="ref">
+  <p>Ainda não entrou no programa? Cadastrando por link de indicação você ganha <b>+20% de boost permanente</b> nos xPoints. Quem indica leva os mesmos 20%, e este é o meu link.</p>
+  <a href="https://defi.xstocks.fi/points?ref=MOOCHI" target="_blank" rel="noopener">Entrar com +20%</a>
+</div>
+
+<div class="hero">
+  <div class="hero-head">
+    <div class="hero-label">Resultado da posição</div>
+    <div class="hero-fdv">
+      <label for="fdv">FDV esperado ($M)</label>
+      <input type="number" id="fdv" value="500" step="50" min="1">
+    </div>
+  </div>
+  <p class="hero-value" id="o-pl">—</p>
+  <p class="hero-note" id="o-sens"></p>
+</div>
+
+<div class="cols">
+<div>
+
+  <section>
+    <h2>Posição na Pendle</h2>
+    <p class="sub">O preço do YT vem cotado em STRCx, não em dólar. <a href="https://app.pendle.finance/trade/markets/0x8ce3a13852d13e0e991c677a8c6137584e2b7635/swap?view=yt&amp;chain=ethereum" target="_blank" rel="noopener">Abrir o mercado na Pendle</a></p>
+    <div class="grid">
+      <div><label for="size">Tamanho ($)</label><input type="number" id="size" value="10000" step="500"></div>
+      <div><label for="ytf">Preço YT (STRCx)</label><input type="number" id="ytf" value="0.04753" step="0.0001"></div>
+      <div><label for="spot">STRCx spot ($)</label><input type="number" id="spot" value="95.01" step="0.01"></div>
+      <div><label for="exp">Vencimento</label><input type="date" id="exp" value="2026-11-25"></div>
+    </div>
+    <p class="note" id="live"></p>
+  </section>
+
+  <section>
+    <h2>Supply de pontos</h2>
+    <p class="sub">Reancore colando leituras novas. O saldo envelhece sozinho a partir da data medida.</p>
+    <div class="grid">
+      <div><label for="sup0">Pontos hoje (B)</label><input type="number" id="sup0" value="23.72" step="0.01"></div>
+      <div><label for="iss0">Emissão/dia (M)</label><input type="number" id="iss0" value="225.1" step="0.1"></div>
+      <div><label for="snap">Medido em</label><input type="date" id="snap" value="2026-09-08"></div>
+      <div><label for="issuer">Emissor (B)</label><input type="number" id="issuer" value="0" step="0.01"></div>
+    </div>
+    <p class="note" id="o-path"></p>
+  </section>
+
+  <section>
+    <h2>Premissas</h2>
+    <p class="sub">Arraste para testar. Nenhuma delas é anunciada pela xStocks.</p>
+    <div class="slider"><label for="rate">Pontos/$/dia</label><input type="range" id="rate" min="0.2" max="4" step="0.01" value="1.33"><input type="number" id="rate-n" min="0.2" max="4" step="0.01" aria-label="Pontos por dólar por dia"></div>
+    <div class="slider"><label for="boost">Seu boost (x)</label><input type="range" id="boost" min="1" max="8" step="0.01" value="2"><input type="number" id="boost-n" min="1" max="8" step="0.01" aria-label="Seu boost"></div>
+    <div class="slider"><label for="drate">Dividendo (%)</label><input type="range" id="drate" min="6" max="16" step="0.05" value="11.05"><input type="number" id="drate-n" min="6" max="16" step="0.05" aria-label="Taxa de dividendo"></div>
+    <div class="slider"><label for="mo">Meses ao airdrop</label><input type="range" id="mo" min="3" max="36" step="1" value="12"><input type="number" id="mo-n" min="3" max="36" step="1" aria-label="Meses até o airdrop"></div>
+    <div class="slider"><label for="pct">Airdrop % do FDV</label><input type="range" id="pct" min="1" max="25" step="0.5" value="10"><input type="number" id="pct-n" min="1" max="25" step="0.5" aria-label="Percentual do FDV alocado ao airdrop"></div>
+    <p class="err" id="err"></p>
+  </section>
+
+</div>
+<div>
+
+  <section>
+    <h2>A posição</h2>
+    <p class="sub">O spot cancela do notional: a alavancagem sai só do preço do YT.</p>
+    <dl class="stats">
+      <div class="stat"><dt>APY implícito</dt><dd id="o-apy">—</dd></div>
+      <div class="stat"><dt>Alavancagem</dt><dd id="o-lev">—</dd></div>
+      <div class="stat"><dt>Custo líquido</dt><dd id="o-net">—</dd></div>
+      <div class="stat"><dt>Custo/1M</dt><dd id="o-per">—</dd></div>
+    </dl>
+    <p class="note" id="o-supply"></p>
+  </section>
+
+</div>
+</div>
+
+<section class="scen">
+  <h2>Cenários de FDV</h2>
+  <p class="sub">Quanto cada milhão de pontos valeria em cada valuation, e o que sobra depois de descontar o que você pagou. O FDV que você digitou lá em cima aparece destacado, na posição dele.</p>
+  <table>
+    <thead><tr><th>FDV do token</th><th>Valor por 1M</th><th>Múltiplo</th><th>Resultado</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</section>
+
+<footer>
+  <p>O supply de pontos e a emissão diária vêm do leaderboard comunitário <a href="https://xpoints.io/" target="_blank" rel="noopener">xpoints.io</a>, que raspa conjuntos públicos de holders on-chain e a API pública de pontos da xStocks. O crawl é incompleto por construção, então o total é um piso. Os dois campos são editáveis: reancore com leituras novas sempre que quiser.</p>
+  <p>A emissão é projetada linearmente: <code>supply = pontos hoje + emissão × meses</code>. Como a emissão sobe junto com o TVL, essa é a ponta otimista.</p>
+  <p>O preço do YT em dólar sai de <code>ytf × spot</code>, e o APY implícito de <code>(1 − ytf)^(−1/t) − 1</code>. O dividendo retorna sobre o par de $100, não sobre o spot. Taxas da Pendle descontadas a 3%.</p>
+  <p>Cada célula assume que um token existe e paga pontos retroativamente. A xStocks não confirmou token, airdrop nem taxa de conversão. Se nada sair, tudo vale zero e a perda é o custo líquido. Isto não é recomendação de investimento, e o link acima é de indicação: se você usá-lo, eu também ganho boost.</p>
+  <p class="credit">Feito por <a href="https://x.com/0xMoochi" target="_blank" rel="noopener">@0xMoochi</a>. Achou um erro ou tem sugestão? Me chama por lá.</p>
+</footer>
+</div>
+<script>
+(function(){
+var FDVS=[50e6,100e6,200e6,300e6,500e6,750e6,1e9,1.5e9,3e9];
+var NUM=["size","ytf","spot","sup0","iss0","issuer","fdv"];
+var DATE=["exp","snap"];
+var SLID={rate:[0.2,4],boost:[1,8],drate:[6,16],mo:[3,36],pct:[1,25]};
+var ALL=NUM.concat(DATE,Object.keys(SLID));
+function el(i){return document.getElementById(i)}
+function G(i){return parseFloat(el(i).value)}
+function D(i){return new Date(el(i).value+"T00:00:00Z")}
+function money(n){
+  var a=Math.abs(n);
+  if(a>=1e9)return "$"+(n/1e9).toFixed(2).replace(/\.?0+$/,"")+"B";
+  if(a>=1e6)return "$"+(n/1e6).toFixed(a>=1e7?0:1).replace(/\.0$/,"")+"M";
+  return "$"+Math.round(n).toLocaleString("pt-BR");
+}
+function save(){try{var s={};ALL.forEach(function(i){s[i]=el(i).value});
+  localStorage.setItem("xpoints",JSON.stringify(s))}catch(e){}}
+function load(){try{var s=JSON.parse(localStorage.getItem("xpoints")||"{}");
+  ALL.forEach(function(i){if(s[i]!==undefined)el(i).value=s[i]})}catch(e){}}
+
+function calc(){
+  for(var k in SLID){var nf=el(k+"-n");if(document.activeElement!==nf)nf.value=el(k).value}
+  var e=el("err");
+  var size=G("size"),ytf=G("ytf"),spot=G("spot");
+  var now=new Date(),days=Math.round((D("exp")-now)/864e5);
+  var sup0=G("sup0")*1e9,iss0=G("iss0")*1e6,issuer=G("issuer")*1e9,mo=G("mo");
+
+  function fail(m){e.textContent=m;e.style.display="block"}
+  if(isNaN(size)||size<=0||isNaN(spot)||spot<=0)return fail("Tamanho e spot precisam ser positivos.");
+  if(isNaN(ytf)||ytf<=0||ytf>=1)return fail("O preço do YT é uma fração de 1 STRCx. Use algo como 0,04753.");
+  if(isNaN(days)||days<=0)return fail("Escolha um vencimento no futuro.");
+  if(isNaN(sup0)||sup0<=0||isNaN(iss0)||iss0<=0||isNaN(issuer)||issuer<0)return fail("Pontos, emissão e emissor precisam ser positivos.");
+  if(isNaN(G("fdv"))||G("fdv")<=0)return fail("O FDV esperado precisa ser positivo.");
+  e.style.display="none";
+
+  var aged=Math.max(0,Math.round((now-D("snap"))/864e5));
+  var today=sup0+iss0*aged;
+  var emitted=iss0*30.4*mo;
+  var sup=today+emitted+issuer;
+
+  var t=days/365,apy=(Math.pow(1-ytf,-1/t)-1)*100;
+  var drate=G("drate"),rate=G("rate"),boost=G("boost");
+  var units=size/(ytf*spot),not=units*spot;
+  var back=units*100*(drate/100)*(days/365)*0.97;
+  var net=size-back;
+  var pts=not*rate*days*boost*0.97;
+  var per=net/(pts/1e6);
+  var p=G("pct")/100;
+
+  el("o-apy").textContent=apy.toFixed(2)+"%";
+  el("o-lev").textContent=(1/ytf).toFixed(1)+"x";
+  el("o-net").textContent=net<=0?"$0":"$"+Math.round(net).toLocaleString("pt-BR");
+  el("o-per").textContent=net<=0?"grátis":"$"+per.toFixed(2);
+  var rr=function(k){return per>0?per*(today+iss0*30.4*mo*k+issuer)/(p*1e6):0};
+  el("o-path").textContent="Constante a "+(iss0/1e6).toFixed(1)+"M/dia por "+mo+" meses emite "+(emitted/1e9).toFixed(1)+"B pontos. Empate com emissão 25% maior: "+money(rr(1.25))+"; 25% menor: "+money(rr(0.75))+".";
+  el("o-supply").textContent="Sua posição controla "+money(not)+" em STRCx e acumula "+(pts/1e6).toFixed(1)+"M pontos até o vencimento. No airdrop a supply projetada é "+(sup/1e9).toFixed(1)+"B, então isso seria "+(pts/sup*100).toFixed(4)+"% do total"+(aged>0?". Leitura de supply feita há "+aged+(aged===1?" dia":" dias")+", já corrigida para hoje":"")+".";
+
+  var heroFdv=G("fdv")*1e6;
+  var heroVal=heroFdv*p*1e6/sup;
+  var heroPl=(heroVal-Math.max(per,0))*(pts/1e6);
+  var be=per>0?per*sup/(p*1e6):0;
+  var hv=el("o-pl");
+  hv.textContent=(heroPl<0?"−$":"+$")+Math.abs(Math.round(heroPl)).toLocaleString("pt-BR");
+  hv.className="hero-value"+(heroPl<0?" lose":"");
+  if(net<=0){
+    el("o-sens").textContent="O dividendo cobre o custo inteiro, então os pontos saem de graça e qualquer FDV é lucro.";
+  }else{
+    el("o-sens").textContent="A "+money(heroFdv)+" de FDV, cada milhão de pontos vale $"+heroVal.toFixed(2)+" contra os $"+per.toFixed(2)+" que você pagou, ou "+(heroVal/per).toFixed(2)+"x. Empata a partir de "+money(be)+".";
+  }
+
+  var scen=FDVS.slice();
+  if(scen.indexOf(heroFdv)===-1)scen.push(heroFdv);
+  scen.sort(function(a,b){return a-b});
+  var html="";
+  scen.forEach(function(f){
+    var val=f*p*1e6/sup,mult=per>0?val/per:Infinity,pl=(val-Math.max(per,0))*(pts/1e6);
+    var win=val>=per,me=(f===heroFdv);
+    html+="<tr class='"+(win?"win":"lose")+(me?" me":"")+"'>"+
+      "<td>"+money(f)+(me?"<span class='tag'>seu FDV</span>":"")+"</td>"+
+      "<td>$"+val.toFixed(2)+"</td>"+
+      "<td class='m'>"+(isFinite(mult)?mult.toFixed(2)+"x":"—")+"</td>"+
+      "<td class='p'>"+(pl<0?"−$":"$")+Math.abs(Math.round(pl)).toLocaleString("pt-BR")+"</td></tr>";
+  });
+  el("rows").innerHTML=html;
+  save();
+}
+load();
+ALL.forEach(function(i){el(i).addEventListener("input",calc)});
+Object.keys(SLID).forEach(function(k){
+  var r=el(k),nf=el(k+"-n"),lo=SLID[k][0],hi=SLID[k][1];
+  nf.addEventListener("input",function(){
+    var v=parseFloat(nf.value);
+    if(!isNaN(v)){r.value=Math.min(hi,Math.max(lo,v));calc()}
+  });
+  nf.addEventListener("blur",function(){nf.value=r.value});
+});
+calc();
+
+/* --- Preço do YT ao vivo -------------------------------------------------
+   Quando a maturidade rolar, troque MARKET pelo endereço do mercado novo.
+   Se a Pendle não responder, a página só mantém o valor salvo.            */
+var MARKET="0x8ce3a13852d13e0e991c677a8c6137584e2b7635";
+var CACHE="xpoints_pendle", CACHE_MS=6e5;
+var touched={ytf:false,exp:false,spot:false};
+["ytf","exp","spot"].forEach(function(i){
+  el(i).addEventListener("input",function(){touched[i]=true});
+});
+function status(m){el("live").textContent=m}
+function apply(m,when){
+  var ms=(typeof m.expiry==="number")?m.expiry*1e3:Date.parse(m.expiry);
+  var apy=parseFloat(m.impliedApy);
+  if(!isFinite(ms)||!isFinite(apy)||apy<=-1)return false;
+  var t=(ms-Date.now())/864e5/365;
+  if(t<=0)return false;
+  var ytf=1-Math.pow(1+apy,-t);
+  if(!(ytf>0&&ytf<1))return false;
+  if(!touched.exp)el("exp").value=new Date(ms).toISOString().slice(0,10);
+  if(!touched.ytf)el("ytf").value=ytf.toFixed(5);
+  var pt=m.pt&&m.pt.price&&parseFloat(m.pt.price.usd), gotSpot=false;
+  if(isFinite(pt)&&pt>0&&!touched.spot){
+    var und=pt/(1-ytf);
+    if(isFinite(und)&&und>0){el("spot").value=und.toFixed(2);gotSpot=true}
+  }
+  calc();
+  status("Lido da Pendle "+when+": APY implícito de "+(apy*100).toFixed(2)+"%, preço do YT"+(gotSpot?" e spot do STRCx":"")+". Edite qualquer campo para usar outro valor.");
+  return true;
+}
+function findMarket(skip){
+  skip=skip||0;
+  return fetch("https://api-v2.pendle.finance/core/v2/markets/all?limit=100&skip="+skip)
+    .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})
+    .then(function(d){
+      var list=(d&&d.markets)||[];
+      for(var i=0;i<list.length;i++){
+        if(String(list[i].address||"").toLowerCase()===MARKET)return list[i];
+      }
+      if(list.length<100||skip>=700)return null;
+      return findMarket(skip+100);
+    });
+}
+(function goLive(){
+  var now=Date.now();
+  try{
+    var c=JSON.parse(localStorage.getItem(CACHE)||"null");
+    if(c&&now-c.t<CACHE_MS&&apply(c.m,"há poucos minutos"))return;
+  }catch(e){}
+  status("Buscando o preço do YT na Pendle…");
+  findMarket().then(function(m){
+    if(!m)return status("Mercado não encontrado na Pendle — a maturidade pode ter rolado. Confira o preço na tela do Pendle e edite o campo.");
+    try{localStorage.setItem(CACHE,JSON.stringify({t:now,m:m}))}catch(e){}
+    if(!apply(m,"agora"))status("A Pendle respondeu com dados incompletos. Usando o valor salvo.");
+  }).catch(function(){
+    status("Não deu para falar com a Pendle agora. Usando o valor salvo — edite à mão se precisar.");
+  });
+})();
+})();
+</script>
+</body>
+</html>
