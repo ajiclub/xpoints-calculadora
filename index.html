@@ -487,9 +487,10 @@ function viaAll(skip){
 })();
 
 /* --- Supply de pontos ao vivo --------------------------------------------
-   Fonte: xpoints.io/api/stats. Preenche o total e a data da leitura.
-   O campo Emissor fica intocado de propósito — institucionais ficam fora
-   da conta por padrão. Se a API não responder, mantém o valor salvo.     */
+   Chama /api/supply, a função serverless que faz proxy do xpoints.io.
+   O endpoint original bloqueia por CORS, então a chamada tem que sair do
+   servidor. O campo Emissor fica intocado de propósito — institucionais
+   ficam fora da conta. Se falhar, a página mantém o valor salvo.        */
 var SCACHE="xpoints_supply", SCACHE_MS=3e5;
 ["sup0","snap"].forEach(function(i){
   touched[i]=false;
@@ -523,12 +524,12 @@ function applyStats(s,when){
     if(c&&now-c.t<SCACHE_MS&&applyStats(c.s,"há poucos minutos"))return;
   }catch(e){}
   status2("Buscando o supply no xpoints.io…");
-  fetch("https://xpoints.io/api/stats")
+  fetch("/api/supply")
     .then(function(r){if(!r.ok)throw 0;return r.json()})
     .then(function(d){
-      var s={total:num(d.totalPointsSum),inst:num(d.institutionalPointsSum),
-             reg:num(d.registered),done:num(d.refreshedThisEra),
-             snap:d.snapshotNumber,at:d.lastFetchAt};
+      if(d&&d.error)throw 0;
+      var s={total:num(d.total),inst:num(d.inst),reg:num(d.reg),
+             done:num(d.done),snap:d.snap,at:d.at};
       try{localStorage.setItem(SCACHE,JSON.stringify({t:now,s:s}))}catch(e){}
       if(!applyStats(s,"agora"))status2("Resposta incompleta do xpoints.io. Usando o valor salvo.");
     })
