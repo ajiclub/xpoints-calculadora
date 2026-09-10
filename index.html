@@ -258,6 +258,7 @@ footer a{color:var(--mint)}
       <div><label for="issuer">Emissor (B)</label><input type="number" id="issuer" value="0" step="0.01"></div>
     </div>
     <p class="note" id="o-path"></p>
+    <p class="note" id="slive"></p>
   </section>
 
   <section>
@@ -407,60 +408,133 @@ calc();
 
 /* --- Preço do YT ao vivo -------------------------------------------------
    Quando a maturidade rolar, troque MARKET pelo endereço do mercado novo.
-   Se a Pendle não responder, a página só mantém o valor salvo.            */
+   Tenta primeiro o endpoint direto por endereço; se falhar, varre a lista.
+   Se nada responder, a página só mantém o valor salvo.                    */
 var MARKET="0x8ce3a13852d13e0e991c677a8c6137584e2b7635";
-var CACHE="xpoints_pendle", CACHE_MS=6e5;
+var CHAIN=1;
+var CACHE="xpoints_pendle2", CACHE_MS=6e5;
 var touched={ytf:false,exp:false,spot:false};
 ["ytf","exp","spot"].forEach(function(i){
   el(i).addEventListener("input",function(){touched[i]=true});
 });
 function status(m){el("live").textContent=m}
-function apply(m,when){
-  var ms=(typeof m.expiry==="number")?m.expiry*1e3:Date.parse(m.expiry);
-  var apy=parseFloat(m.impliedApy);
-  if(!isFinite(ms)||!isFinite(apy)||apy<=-1)return false;
+function num(v){var n=parseFloat(v);return isFinite(n)?n:null}
+
+function apply(f,when){
+  if(!f)return false;
+  var apy=num(f.apy);
+  if(apy===null||apy<=-1)return false;
+  var ms=f.expiry||Date.parse(el("exp").value+"T00:00:00Z");
+  if(!isFinite(ms))return false;
   var t=(ms-Date.now())/864e5/365;
   if(t<=0)return false;
   var ytf=1-Math.pow(1+apy,-t);
   if(!(ytf>0&&ytf<1))return false;
-  if(!touched.exp)el("exp").value=new Date(ms).toISOString().slice(0,10);
+  if(f.expiry&&!touched.exp)el("exp").value=new Date(ms).toISOString().slice(0,10);
   if(!touched.ytf)el("ytf").value=ytf.toFixed(5);
-  var pt=m.pt&&m.pt.price&&parseFloat(m.pt.price.usd), gotSpot=false;
-  if(isFinite(pt)&&pt>0&&!touched.spot){
-    var und=pt/(1-ytf);
-    if(isFinite(und)&&und>0){el("spot").value=und.toFixed(2);gotSpot=true}
-  }
+  var spot=(f.spot!=null)?f.spot:((f.pt!=null)?f.pt/(1-ytf):null);
+  var gotSpot=false;
+  if(spot!=null&&spot>0&&!touched.spot){el("spot").value=spot.toFixed(2);gotSpot=true}
   calc();
   status("Lido da Pendle "+when+": APY implícito de "+(apy*100).toFixed(2)+"%, preço do YT"+(gotSpot?" e spot do STRCx":"")+". Edite qualquer campo para usar outro valor.");
   return true;
 }
-function findMarket(skip){
+
+/* 1 chamada: endpoint direto por endereço */
+function viaData(){
+  return fetch("https://api-v2.pendle.finance/core/v2/"+CHAIN+"/markets/"+MARKET+"/data")
+    .then(function(r){if(!r.ok)throw 0;return r.json()})
+    .then(function(d){
+      var apy=num(d&&d.impliedApy);
+      if(apy===null)throw 0;
+      return {apy:apy,expiry:null,spot:num(d&&d.assetPriceUsd),pt:null};
+    });
+}
+
+/* reserva: varre a lista completa de mercados */
+function viaAll(skip){
   skip=skip||0;
   return fetch("https://api-v2.pendle.finance/core/v2/markets/all?limit=100&skip="+skip)
-    .then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})
+    .then(function(r){if(!r.ok)throw 0;return r.json()})
     .then(function(d){
       var list=(d&&d.markets)||[];
       for(var i=0;i<list.length;i++){
-        if(String(list[i].address||"").toLowerCase()===MARKET)return list[i];
+        var m=list[i];
+        if(String(m.address||"").toLowerCase()!==MARKET)continue;
+        var ms=(typeof m.expiry==="number")?m.expiry*1e3:Date.parse(m.expiry);
+        return {apy:num(m.impliedApy),expiry:isFinite(ms)?ms:null,
+                spot:null,pt:num(m.pt&&m.pt.price&&m.pt.price.usd)};
       }
-      if(list.length<100||skip>=700)return null;
-      return findMarket(skip+100);
+      if(!list.length||skip>=3000)return null;
+      return viaAll(skip+100);
     });
 }
+
 (function goLive(){
   var now=Date.now();
   try{
     var c=JSON.parse(localStorage.getItem(CACHE)||"null");
-    if(c&&now-c.t<CACHE_MS&&apply(c.m,"há poucos minutos"))return;
+    if(c&&now-c.t<CACHE_MS&&apply(c.f,"há poucos minutos"))return;
   }catch(e){}
   status("Buscando o preço do YT na Pendle…");
-  findMarket().then(function(m){
-    if(!m)return status("Mercado não encontrado na Pendle — a maturidade pode ter rolado. Confira o preço na tela do Pendle e edite o campo.");
-    try{localStorage.setItem(CACHE,JSON.stringify({t:now,m:m}))}catch(e){}
-    if(!apply(m,"agora"))status("A Pendle respondeu com dados incompletos. Usando o valor salvo.");
+  viaData().catch(function(){return viaAll()}).then(function(f){
+    if(!f)return status("Mercado não encontrado na Pendle — a maturidade pode ter rolado. Confira o preço na tela do Pendle e edite o campo.");
+    try{localStorage.setItem(CACHE,JSON.stringify({t:now,f:f}))}catch(e){}
+    if(!apply(f,"agora"))status("A Pendle respondeu com dados incompletos. Usando o valor salvo.");
   }).catch(function(){
     status("Não deu para falar com a Pendle agora. Usando o valor salvo — edite à mão se precisar.");
   });
+})();
+
+/* --- Supply de pontos ao vivo --------------------------------------------
+   Fonte: xpoints.io/api/stats. Preenche o total e a data da leitura.
+   O campo Emissor fica intocado de propósito — institucionais ficam fora
+   da conta por padrão. Se a API não responder, mantém o valor salvo.     */
+var SCACHE="xpoints_supply", SCACHE_MS=3e5;
+["sup0","snap"].forEach(function(i){
+  touched[i]=false;
+  el(i).addEventListener("input",function(){touched[i]=true});
+});
+function status2(m){el("slive").textContent=m}
+function br(n,d){return n.toLocaleString("pt-BR",{minimumFractionDigits:d,maximumFractionDigits:d})}
+
+function applyStats(s,when){
+  if(!s)return false;
+  var total=num(s.total);
+  if(total===null||total<=0)return false;
+  if(!touched.sup0)el("sup0").value=(total/1e9).toFixed(2);
+  var ms=Date.parse(s.at);
+  if(isFinite(ms)&&!touched.snap)el("snap").value=new Date(ms).toISOString().slice(0,10);
+  calc();
+  var msg="Supply lido do xpoints.io "+when+": "+br(total/1e9,2)+"B";
+  if(s.reg)msg+=" em "+br(s.reg,0)+" carteiras";
+  if(s.snap)msg+=", snapshot #"+s.snap;
+  if(s.reg&&s.done)msg+=" com "+Math.round(s.done/s.reg*100)+"% revisado";
+  msg+=".";
+  if(s.inst)msg+=" Institucionais somam "+br(s.inst/1e9,1)+"B e estão fora da conta — coloque no campo Emissor para incluir.";
+  status2(msg);
+  return true;
+}
+
+(function goSupply(){
+  var now=Date.now();
+  try{
+    var c=JSON.parse(localStorage.getItem(SCACHE)||"null");
+    if(c&&now-c.t<SCACHE_MS&&applyStats(c.s,"há poucos minutos"))return;
+  }catch(e){}
+  status2("Buscando o supply no xpoints.io…");
+  fetch("https://xpoints.io/api/stats")
+    .then(function(r){if(!r.ok)throw 0;return r.json()})
+    .then(function(d){
+      var s={total:num(d.totalPointsSum),inst:num(d.institutionalPointsSum),
+             reg:num(d.registered),done:num(d.refreshedThisEra),
+             snap:d.snapshotNumber,at:d.lastFetchAt};
+      try{localStorage.setItem(SCACHE,JSON.stringify({t:now,s:s}))}catch(e){}
+      if(!applyStats(s,"agora"))status2("Resposta incompleta do xpoints.io. Usando o valor salvo.");
+    })
+    .catch(function(){
+      status2("Não deu para falar com o xpoints.io agora. Usando o valor salvo — edite à mão se precisar.");
+    });
 })();
 })();
 </script>
